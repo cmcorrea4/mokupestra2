@@ -6,12 +6,12 @@ import json
 import base64
 from requests.auth import HTTPBasicAuth
 
-# Importación condicional de OpenAI
+# Importación condicional de Google Generative AI
 try:
-    import openai
-    OPENAI_AVAILABLE = True
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    GEMINI_AVAILABLE = False
 
 # Configuración de la página
 st.set_page_config(
@@ -105,41 +105,51 @@ def consultar_endpoint_energia():
         st.sidebar.write(f"Debug - Error completo: {str(e)}")
         return None
 
-# Función para generar respuesta con OpenAI
-def generar_respuesta_openai(prompt, datos_energia, maquina_seleccionada, api_key):
-    """Genera respuesta usando OpenAI con los datos del endpoint"""
-    if not OPENAI_AVAILABLE:
-        return "❌ OpenAI no está disponible. Por favor instala la librería: pip install openai"
+# Función para generar respuesta con Google Gemini 2.5 Pro
+def generar_respuesta_gemini(prompt, datos_energia, maquina_seleccionada, api_key):
+    """Genera respuesta usando Google Gemini 2.5 Pro con los datos del endpoint"""
+    if not GEMINI_AVAILABLE:
+        return "❌ Google Generative AI no está disponible. Instala la librería: pip install google-generativeai"
     
     try:
-        client = openai.OpenAI(api_key=api_key)
+        # Configurar API key de Gemini
+        genai.configure(api_key=api_key)
+        
+        # Configurar el modelo Gemini 2.5 Pro
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         # Preparar contexto con datos reales del endpoint
         contexto = f"""
         Eres S.O.S EnergIA, un asistente especializado en análisis energético de ESTRA.
         
-        Máquina actual: {maquina_seleccionada}
+        Información del centro de costos actual:
+        - Máquina seleccionada: {maquina_seleccionada}
         
-        Datos del sistema de energía:
+        Datos en tiempo real del sistema de energía:
         {json.dumps(datos_energia, indent=2) if datos_energia else "No hay datos disponibles del endpoint"}
         
-        Responde de manera técnica pero amigable, usando los datos proporcionados cuando sea relevante.
-        Mantén las respuestas concisas (máximo 3-4 líneas).
+        Instrucciones:
+        - Responde de manera técnica pero amigable
+        - Usa los datos proporcionados cuando sean relevantes
+        - Mantén respuestas concisas (máximo 4-5 líneas)
+        - Si hay datos numéricos, proporciona análisis específicos
+        - Incluye emojis técnicos apropiados (⚡, 📊, 🔧, etc.)
         """
         
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": contexto},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=200,
-            temperature=0.7
+        # Generar respuesta con Gemini
+        response = model.generate_content(
+            f"{contexto}\n\nPregunta del usuario: {prompt}",
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=250,
+                temperature=0.7,
+                top_p=0.8,
+            )
         )
         
-        return response.choices[0].message.content
+        return response.text
+        
     except Exception as e:
-        return f"Error al generar respuesta: {str(e)}"
+        return f"Error al generar respuesta con Gemini: {str(e)}"
 
 # Función para generar datos sintéticos
 def generar_datos_energia(centro, periodo="Semana", numero_periodos=24):
@@ -254,28 +264,28 @@ def mostrar_estadisticas(centro_seleccionado, periodo_seleccionado):
 # Sidebar para controles
 st.sidebar.header("🔧 Panel de Control")
 
-# Campo para API KEY de OpenAI
+# Campo para API KEY de Gemini
 st.sidebar.markdown("### 🤖 Configuración de IA")
 
-if not OPENAI_AVAILABLE:
-    st.sidebar.error("❌ OpenAI no instalado")
-    st.sidebar.code("pip install openai")
-    api_key_openai = None
+if not GEMINI_AVAILABLE:
+    st.sidebar.error("❌ Google Generative AI no instalado")
+    st.sidebar.code("pip install google-generativeai")
+    api_key_gemini = None
 else:
-    api_key_openai = st.sidebar.text_input(
-        "API Key de OpenAI:",
+    api_key_gemini = st.sidebar.text_input(
+        "API Key de Google Gemini:",
         type="password",
-        help="Ingresa tu API Key de OpenAI para habilitar el asistente inteligente",
-        placeholder="sk-..."
+        help="Ingresa tu API Key de Google Gemini 2.5 Pro para habilitar el asistente inteligente",
+        placeholder="AI..."
     )
 
 # Indicador del estado de la API
-if OPENAI_AVAILABLE and api_key_openai:
+if GEMINI_AVAILABLE and api_key_gemini:
     st.sidebar.success("✅ API Key configurada")
-elif OPENAI_AVAILABLE and not api_key_openai:
+elif GEMINI_AVAILABLE and not api_key_gemini:
     st.sidebar.warning("⚠️ API Key requerida para IA")
 else:
-    st.sidebar.error("❌ OpenAI no disponible")
+    st.sidebar.error("❌ Google Generative AI no disponible")
 
 # Configuración manual de endpoint (para testing)
 st.sidebar.markdown("---")
@@ -461,8 +471,8 @@ with col2:
         st.session_state.mensajes = []
         # Mensaje de bienvenida
         mensaje_bienvenida = "¿En que puedo ayudarte desde nuestro centro de analítica de datos para el Sistema de Gestión Energética?"
-        if api_key_openai:
-            mensaje_bienvenida += " 🤖 IA avanzada activada."
+        if api_key_gemini:
+            mensaje_bienvenida += " Gemini 2.5 Pro activado."
         st.session_state.mensajes.append({
             "role": "assistant", 
             "content": mensaje_bienvenida
@@ -514,15 +524,15 @@ with col2:
         st.session_state.mensajes.append({"role": "user", "content": prompt_to_process})
         
         # Generar respuesta
-        if OPENAI_AVAILABLE and api_key_openai:
-            # Usar OpenAI con datos del endpoint
+        if GEMINI_AVAILABLE and api_key_gemini:
+            # Usar Gemini con datos del endpoint
             datos_endpoint = st.session_state.get("datos_endpoint", None)
-            with st.spinner("🤖 Generando respuesta..."):
-                respuesta = generar_respuesta_openai(
+            with st.spinner("Generando respuesta con Gemini..."):
+                respuesta = generar_respuesta_gemini(
                     prompt_to_process, 
                     datos_endpoint, 
                     maquina_seleccionada, 
-                    api_key_openai
+                    api_key_gemini
                 )
         else:
             # Respuestas básicas predefinidas usando datos reales si están disponibles
