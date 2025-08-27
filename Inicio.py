@@ -106,7 +106,7 @@ def consultar_endpoint_energia():
 
 # Función para generar respuesta con Google Gemini 2.5 Pro
 def generar_respuesta_gemini(prompt, datos_energia, maquina_seleccionada, api_key):
-    """Genera respuesta usando Google Gemini 2.5 Pro con los datos del endpoint"""
+    """Genera respuesta con los datos del endpoint"""
     if not GEMINI_AVAILABLE:
         return "❌ Google Generative AI no está disponible. Instala la librería: pip install google-generativeai"
     
@@ -148,7 +148,7 @@ def generar_respuesta_gemini(prompt, datos_energia, maquina_seleccionada, api_ke
         return response.text
         
     except Exception as e:
-        return f"Error al generar respuesta con Gemini: {str(e)}"
+        return f"Error al generar respuesta con IA: {str(e)}"
 
 # Función para generar datos sintéticos
 def generar_datos_energia(centro, periodo="Semana", numero_periodos=24):
@@ -445,10 +445,10 @@ with col2:
     
     # Verificar si Gemini está configurado
     if not GEMINI_AVAILABLE:
-        st.warning("Configura Google Generative AI. Ejecuta: pip install google-generativeai para habilitar IA avanzada.")
+        #st.warning("Configura para habilitar IA avanzada.")
         st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
     elif not api_key_gemini:
-        st.warning("Configura tu API Key de Google Gemini en el sidebar para usar el asistente inteligente.")
+        #st.warning("Configura tu API Key de Google Gemini en el sidebar para usar el asistente inteligente.")
         st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
     
     # Inicializar el historial de chat
@@ -457,7 +457,7 @@ with col2:
         # Mensaje de bienvenida
         mensaje_bienvenida = "¿En que puedo ayudarte desde nuestro centro de analítica de datos para el Sistema de Gestión Energética?"
         if api_key_gemini:
-            mensaje_bienvenida += " Gemini 2.5 Pro activado."
+            mensaje_bienvenida += " con IA "
         st.session_state.mensajes.append({
             "role": "assistant", 
             "content": mensaje_bienvenida
