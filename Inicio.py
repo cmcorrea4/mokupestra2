@@ -30,18 +30,17 @@ def consultar_endpoint_energia():
     try:
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
-        # Configurar headers adicionales
+        # Usar las mismas credenciales que funcionan en Postman
+        auth = HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D')
+        
+        # Headers simples como en Postman
         headers = {
-            'User-Agent': 'ESTRA-Streamlit-App/1.0',
             'Accept': 'application/json',
         }
         
-        # Credenciales de autenticación básica
-        auth = HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D')
-        
         st.sidebar.write(f"🔗 Consultando: {url}")
         
-        # Realizar la petición
+        # Realizar la petición exactamente como Postman
         response = requests.get(
             url, 
             auth=auth, 
@@ -51,37 +50,33 @@ def consultar_endpoint_energia():
         
         # Log de debug
         st.sidebar.write(f"🔍 Status Code: {response.status_code}")
-        st.sidebar.write(f"🔍 Headers respuesta: {dict(response.headers)}")
         
-        # Mostrar respuesta completa para debug
-        if response.status_code != 200:
-            st.sidebar.write(f"📄 Respuesta del servidor:")
-            st.sidebar.text(response.text[:500] if response.text else "Sin contenido")
-        
-        # Verificar el código de estado
-        if response.status_code == 401:
-            st.error("❌ Error de autenticación (401). Credenciales incorrectas.")
-            return None
-        elif response.status_code == 403:
-            st.error("❌ Acceso prohibido (403). Sin permisos para este endpoint.")
-            return None
-        elif response.status_code == 404:
-            st.error("❌ Endpoint no encontrado (404). El endpoint /test-summary no existe.")
-            return None
-        elif response.status_code == 500:
-            st.error("❌ Error interno del servidor (500).")
-            return None
-        
-        response.raise_for_status()
-        
-        # Intentar parsear JSON
-        try:
-            data = response.json()
-            st.sidebar.success(f"✅ Datos obtenidos: {len(str(data))} caracteres")
-            return data
-        except json.JSONDecodeError:
-            st.error("❌ Respuesta no es JSON válido")
-            st.sidebar.write(f"Respuesta recibida: {response.text[:200]}...")
+        # Si es 200, parsear directamente
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                st.sidebar.success(f"✅ Datos obtenidos correctamente")
+                st.sidebar.info(f"📊 Campos recibidos: {list(data.keys()) if isinstance(data, dict) else 'Lista de elementos'}")
+                return data
+            except json.JSONDecodeError as e:
+                st.error(f"❌ Error parseando JSON: {str(e)}")
+                st.sidebar.write(f"Respuesta recibida: {response.text[:300]}...")
+                return None
+        else:
+            # Mostrar información de debug para otros códigos
+            st.sidebar.write(f"❌ Error {response.status_code}")
+            st.sidebar.write(f"Headers de respuesta: {dict(response.headers)}")
+            st.sidebar.write(f"Contenido: {response.text[:300] if response.text else 'Sin contenido'}")
+            
+            if response.status_code == 401:
+                st.error("❌ Error de autenticación (401). Las credenciales no son válidas.")
+            elif response.status_code == 403:
+                st.error("❌ Acceso prohibido (403). Sin permisos para este endpoint.")
+            elif response.status_code == 404:
+                st.error("❌ Endpoint no encontrado (404).")
+            else:
+                st.error(f"❌ Error del servidor: {response.status_code}")
+            
             return None
             
     except requests.exceptions.Timeout:
