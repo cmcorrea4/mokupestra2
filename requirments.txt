@@ -1,1 +1,26 @@
-streamlit
+# Core Streamlit and data processing
+streamlit>=1.28.0
+pandas>=1.5.0
+numpy>=1.24.0
+
+# API and HTTP requests
+requests>=2.31.0
+openai>=1.0.0
+
+# Data visualization (if needed for future enhancements)
+plotly>=5.15.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# JSON handling and utilities
+urllib3>=1.26.0
+
+# Optional: For enhanced data processing
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# Optional: For date/time handling
+python-dateutil>=2.8.0
+
+# Optional: For environment variables (if you want to use .env files)
+python-dotenv>=1.0.0
