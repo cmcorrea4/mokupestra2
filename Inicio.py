@@ -34,33 +34,42 @@ def consultar_endpoint_energia():
         headers = {
             'User-Agent': 'ESTRA-Streamlit-App/1.0',
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
         }
         
         # Credenciales de autenticación básica
         auth = HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D')
         
-        # Realizar la petición con mayor timeout
+        st.sidebar.write(f"🔗 Consultando: {url}")
+        
+        # Realizar la petición
         response = requests.get(
             url, 
             auth=auth, 
             headers=headers,
-            timeout=30,
-            verify=True  # Verificar certificados SSL
+            timeout=30
         )
         
-        # Log de debug (opcional)
+        # Log de debug
         st.sidebar.write(f"🔍 Status Code: {response.status_code}")
+        st.sidebar.write(f"🔍 Headers respuesta: {dict(response.headers)}")
+        
+        # Mostrar respuesta completa para debug
+        if response.status_code != 200:
+            st.sidebar.write(f"📄 Respuesta del servidor:")
+            st.sidebar.text(response.text[:500] if response.text else "Sin contenido")
         
         # Verificar el código de estado
         if response.status_code == 401:
-            st.error("❌ Error de autenticación (401). Verificar credenciales.")
+            st.error("❌ Error de autenticación (401). Credenciales incorrectas.")
             return None
         elif response.status_code == 403:
-            st.error("❌ Acceso prohibido (403). Sin permisos.")
+            st.error("❌ Acceso prohibido (403). Sin permisos para este endpoint.")
             return None
         elif response.status_code == 404:
-            st.error("❌ Endpoint no encontrado (404).")
+            st.error("❌ Endpoint no encontrado (404). El endpoint /test-summary no existe.")
+            return None
+        elif response.status_code == 500:
+            st.error("❌ Error interno del servidor (500).")
             return None
         
         response.raise_for_status()
@@ -80,9 +89,6 @@ def consultar_endpoint_energia():
         return None
     except requests.exceptions.ConnectionError:
         st.error("🌐 Error de conexión: No se pudo conectar al servidor")
-        return None
-    except requests.exceptions.SSLError:
-        st.error("🔒 Error SSL: Problema con el certificado")
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"❌ Error en la petición: {str(e)}")
@@ -263,54 +269,32 @@ elif OPENAI_AVAILABLE and not api_key_openai:
 else:
     st.sidebar.error("❌ OpenAI no disponible")
 
+# Configuración manual de endpoint (para testing)
 st.sidebar.markdown("---")
+st.sidebar.subheader("🔧 Configuración API")
+custom_endpoint = st.sidebar.text_input(
+    "Endpoint personalizado (opcional):",
+    placeholder="https://energy-api-628964750053.us-east1.run.app/api/data",
+    help="Si encuentras un endpoint que funciona, úsalo aquí"
+)
 
-# Botón para consultar endpoint con debug
-col_btn1, col_btn2 = st.sidebar.columns(2)
+# Mostrar endpoint que funciona si se encontró
+if "working_endpoint" in st.session_state:
+    st.sidebar.success(f"✅ Endpoint encontrado: {st.session_state.working_endpoint}")
+    if st.sidebar.button("🎯 Usar Endpoint Encontrado"):
+        custom_endpoint = st.session_state.working_endpoint
 
-with col_btn1:
-    if st.button("🔌 Consultar API", use_container_width=True):
-        with st.sidebar:
-            with st.spinner("Consultando endpoint..."):
-                st.write("🔄 Conectando al servidor...")
-                datos_endpoint = consultar_endpoint_energia()
-                if datos_endpoint:
-                    st.success("✅ Datos obtenidos correctamente")
-                    # Guardar en session state para uso posterior
-                    st.session_state.datos_endpoint = datos_endpoint
-                else:
-                    st.error("❌ Error al obtener datos")
-
-with col_btn2:
-    if st.button("🧪 Test Conexión", use_container_width=True):
-        with st.sidebar:
-            with st.spinner("Probando conexión..."):
-                try:
-                    # Test simple de conectividad
-                    test_response = requests.get(
-                        "https://energy-api-628964750053.us-east1.run.app/",
-                        timeout=5
-                    )
-                    st.write(f"🌐 Servidor responde: {test_response.status_code}")
-                except Exception as e:
-                    st.write(f"🌐 Error de conexión: {str(e)}")
-                
-                # Test de autenticación
-                try:
-                    auth_test = requests.get(
-                        "https://energy-api-628964750053.us-east1.run.app/test-summary",
-                        auth=HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'),
-                        timeout=10
-                    )
-                    st.write(f"🔐 Auth test: {auth_test.status_code}")
-                    if auth_test.status_code == 200:
-                        st.write("✅ Autenticación OK")
-                    elif auth_test.status_code == 401:
-                        st.write("❌ Credenciales incorrectas")
-                    else:
-                        st.write(f"⚠️ Respuesta: {auth_test.status_code}")
-                except Exception as e:
-                    st.write(f"🔐 Error auth: {str(e)}")
+# Botón para consultar endpoint
+if st.sidebar.button("🔌 Consultar Datos del Sistema", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("Consultando endpoint..."):
+            datos_endpoint = consultar_endpoint_energia()
+            if datos_endpoint:
+                st.success("✅ Datos obtenidos correctamente")
+                # Guardar en session state para uso posterior
+                st.session_state.datos_endpoint = datos_endpoint
+            else:
+                st.error("❌ Error al obtener datos")
 
 # Mostrar estado de la conexión al endpoint con más detalle
 if "datos_endpoint" in st.session_state:
