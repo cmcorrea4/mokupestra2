@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import requests
 import json
+import base64
 from requests.auth import HTTPBasicAuth
 
 # Importación condicional de OpenAI
@@ -11,7 +12,6 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    st.warning("⚠️ OpenAI no está instalado. Instala con: pip install openai")
 
 # Configuración de la página
 st.set_page_config(
@@ -23,27 +23,34 @@ st.set_page_config(
 # Título principal
 st.title("ESTRA - Plataforma inteligente de Analítica de eficiencia energética y productiva")
 
-# Función para consultar el endpoint de energía
+# Función para consultar el endpoint de energía usando el método que funciona en Digital Ocean
 @st.cache_data(ttl=300)  # Cache por 5 minutos
 def consultar_endpoint_energia():
-    """Consulta el endpoint de energía con las credenciales proporcionadas"""
+    """Consulta el endpoint de energía usando el mismo método que funciona en Digital Ocean"""
     try:
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
-        # Usar las mismas credenciales que funcionan en Postman
-        auth = HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D')
+        # Usar el mismo método de autenticación que funciona en Digital Ocean
+        username = 'sume'
+        password = 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'
         
-        # Headers simples como en Postman
+        # Crear las credenciales exactamente como en Digital Ocean
+        credentials = f"{username}:{password}"
+        encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+        
+        # Configurar headers exactamente como en Digital Ocean
         headers = {
-            'Accept': 'application/json',
+            'Authorization': f'Basic {encoded_credentials}',
+            'User-Agent': 'StreamlitApp/1.0',  # Similar al de Digital Ocean
+            'Accept': 'application/json'
         }
         
         st.sidebar.write(f"🔗 Consultando: {url}")
+        st.sidebar.write(f"🔐 Auth Header: Basic {encoded_credentials[:20]}...")  # Mostrar solo primeros caracteres
         
-        # Realizar la petición exactamente como Postman
+        # Realizar la petición usando requests pero con headers manuales
         response = requests.get(
             url, 
-            auth=auth, 
             headers=headers,
             timeout=30
         )
@@ -56,7 +63,11 @@ def consultar_endpoint_energia():
             try:
                 data = response.json()
                 st.sidebar.success(f"✅ Datos obtenidos correctamente")
-                st.sidebar.info(f"📊 Campos recibidos: {list(data.keys()) if isinstance(data, dict) else 'Lista de elementos'}")
+                st.sidebar.info(f"📊 Tipo de datos: {type(data).__name__}")
+                if isinstance(data, dict):
+                    st.sidebar.info(f"📊 Campos: {list(data.keys())}")
+                elif isinstance(data, list):
+                    st.sidebar.info(f"📊 Elementos: {len(data)}")
                 return data
             except json.JSONDecodeError as e:
                 st.error(f"❌ Error parseando JSON: {str(e)}")
@@ -66,7 +77,8 @@ def consultar_endpoint_energia():
             # Mostrar información de debug para otros códigos
             st.sidebar.write(f"❌ Error {response.status_code}")
             st.sidebar.write(f"Headers de respuesta: {dict(response.headers)}")
-            st.sidebar.write(f"Contenido: {response.text[:300] if response.text else 'Sin contenido'}")
+            response_text = response.text[:300] if response.text else 'Sin contenido'
+            st.sidebar.write(f"Contenido: {response_text}")
             
             if response.status_code == 401:
                 st.error("❌ Error de autenticación (401). Las credenciales no son válidas.")
@@ -90,6 +102,7 @@ def consultar_endpoint_energia():
         return None
     except Exception as e:
         st.error(f"❌ Error inesperado: {str(e)}")
+        st.sidebar.write(f"Debug - Error completo: {str(e)}")
         return None
 
 # Función para generar respuesta con OpenAI
@@ -404,8 +417,29 @@ with col1:
     
     # Mostrar datos del endpoint si están disponibles
     if "datos_endpoint" in st.session_state:
-        with st.expander("🔌 Datos del Sistema de Energía"):
-            st.json(st.session_state.datos_endpoint)
+        with st.expander("🔌 Datos del Sistema de Energía (API Real)"):
+            datos = st.session_state.datos_endpoint
+            
+            if isinstance(datos, dict):
+                # Mostrar datos de forma organizada
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**📊 Información del Sistema:**")
+                    for key, value in datos.items():
+                        if key not in ['dateStart', 'dateEnd']:
+                            st.write(f"• **{key}**: {value}")
+                
+                with col2:
+                    st.write("**📅 Periodo de Datos:**")
+                    if 'dateStart' in datos:
+                        st.write(f"• **Inicio**: {datos['dateStart']}")
+                    if 'dateEnd' in datos:
+                        st.write(f"• **Fin**: {datos['dateEnd']}")
+            
+            # Mostrar JSON completo en un expander adicional
+            with st.expander("Ver JSON completo"):
+                st.json(datos)
     
     # Tabla de datos
     with st.expander("📋 Ver Datos Detallados"):
@@ -491,48 +525,61 @@ with col2:
                     api_key_openai
                 )
         else:
-            # Respuestas básicas predefinidas
-            numero_periodos = {
-                "Día": 30,
-                "Semana": 24,
-                "Mes": 12
-            }
+            # Respuestas básicas predefinidas usando datos reales si están disponibles
+            datos_endpoint = st.session_state.get("datos_endpoint", None)
             
-            tiempo, frente_a_abt, frente_a_linea_base = generar_datos_energia(
-                maquina_seleccionada, 
-                periodo_seleccionado, 
-                numero_periodos[periodo_seleccionado]
-            )
-            
-            # Unidades según el periodo
-            unidad_periodo = {
-                "Día": "kWh/día",
-                "Semana": "kWh/semana",
-                "Mes": "kWh/mes"
-            }
-            unidad = unidad_periodo[periodo_seleccionado]
-            
-            # Respuestas basadas en palabras clave
+            # Respuestas mejoradas con datos reales del endpoint
             if "consumo" in prompt_to_process.lower():
-                respuesta = f"La {maquina_seleccionada} tiene un consumo teórico promedio de {np.mean(frente_a_abt):.1f} {unidad} y real de {np.mean(frente_a_linea_base):.1f} {unidad} (análisis {periodo_seleccionado.lower()})."
-            elif "eficiencia" in prompt_to_process.lower():
-                diferencia = np.mean(frente_a_linea_base) - np.mean(frente_a_abt)
-                eficiencia = (1 - abs(diferencia)/np.mean(frente_a_abt)) * 100
-                respuesta = f"La eficiencia energética {periodo_seleccionado.lower()} es del {eficiencia:.1f}%. {'🟢 Excelente rendimiento.' if eficiencia > 90 else '🟡 Se recomienda revisión.'}"
-            elif "sistema" in prompt_to_process.lower() and "datos" in prompt_to_process.lower():
-                if "datos_endpoint" in st.session_state:
-                    respuesta = "✅ Tengo acceso a datos en tiempo real del sistema de energía. Los datos se actualizan automáticamente desde el endpoint."
+                if datos_endpoint and isinstance(datos_endpoint, dict):
+                    molde_id = datos_endpoint.get('moldId', 'N/A')
+                    centro_costo = datos_endpoint.get('cceId', maquina_seleccionada)
+                    tiempo_efectivo = datos_endpoint.get('pdnEffectiveTime', 'N/A')
+                    respuesta = f"📊 Datos reales del sistema - Molde: {molde_id}, Centro: {centro_costo}, Tiempo efectivo: {tiempo_efectivo} horas."
                 else:
-                    respuesta = "❌ No hay conexión actual con el sistema de energía. Usa el botón 'Consultar Datos del Sistema' en el sidebar para conectar."
+                    numero_periodos = {"Día": 30, "Semana": 24, "Mes": 12}
+                    tiempo, frente_a_abt, frente_a_linea_base = generar_datos_energia(
+                        maquina_seleccionada, periodo_seleccionado, numero_periodos[periodo_seleccionado]
+                    )
+                    unidad = {"Día": "kWh/día", "Semana": "kWh/semana", "Mes": "kWh/mes"}[periodo_seleccionado]
+                    respuesta = f"La {maquina_seleccionada} tiene un consumo teórico promedio de {np.mean(frente_a_abt):.1f} {unidad} y real de {np.mean(frente_a_linea_base):.1f} {unidad}."
+            
+            elif "eficiencia" in prompt_to_process.lower():
+                if datos_endpoint and isinstance(datos_endpoint, dict):
+                    tiempo_total = datos_endpoint.get('pdnTotalTime', 0)
+                    tiempo_efectivo = datos_endpoint.get('pdnEffectiveTime', 0)
+                    if tiempo_total and float(tiempo_total) > 0:
+                        eficiencia = (float(tiempo_efectivo) / float(tiempo_total)) * 100
+                        respuesta = f"🎯 Eficiencia real del sistema: {eficiencia:.1f}% (Tiempo efectivo: {tiempo_efectivo}h / Tiempo total: {tiempo_total}h)"
+                    else:
+                        respuesta = f"📊 Datos disponibles - Tiempo efectivo: {tiempo_efectivo}h, Tiempo total: {tiempo_total}h"
+                else:
+                    respuesta = "La eficiencia energética se puede calcular con datos reales. Consulta primero los datos del sistema."
+            
+            elif "sistema" in prompt_to_process.lower() and "datos" in prompt_to_process.lower():
+                if datos_endpoint:
+                    num_campos = len(datos_endpoint.keys()) if isinstance(datos_endpoint, dict) else len(datos_endpoint)
+                    respuesta = f"✅ Datos del sistema disponibles: {num_campos} campos de información. Incluye tiempos de producción, fechas y códigos de referencia."
+                else:
+                    respuesta = "❌ No hay datos del sistema disponibles. Usa el botón 'Consultar Datos del Sistema' para conectar."
+            
             elif "estado" in prompt_to_process.lower():
-                estados = {
-                    "H75": "🟢 Operativa - Funcionamiento normal", 
-                    "Extrusora LEISTRITZ ZSE-27": "🟢 Operativa - Funcionamiento normal", 
-                    "Inyectora ENGEL e-motion 310": "🟡 En mantenimiento preventivo"
-                }
-                respuesta = f"Estado actual: {estados.get(maquina_seleccionada, 'N/A')}"
+                if datos_endpoint and isinstance(datos_endpoint, dict):
+                    orden_id = datos_endpoint.get('orderId', 'N/A')
+                    fecha_inicio = datos_endpoint.get('dateStart', 'N/A')
+                    respuesta = f"🔧 Estado del sistema - Orden activa: {orden_id}, Fecha inicio: {fecha_inicio}"
+                else:
+                    estados = {
+                        "H75": "🟢 Operativa - Funcionamiento normal", 
+                        "Extrusora LEISTRITZ ZSE-27": "🟢 Operativa - Funcionamiento normal", 
+                        "Inyectora ENGEL e-motion 310": "🟡 En mantenimiento preventivo"
+                    }
+                    respuesta = f"Estado actual: {estados.get(maquina_seleccionada, 'N/A')}"
+            
             else:
-                respuesta = f"Analizando {maquina_seleccionada} por {periodo_seleccionado.lower()}. Configura OpenAI API para respuestas más inteligentes. Puedes preguntar sobre: consumo, eficiencia, datos del sistema, estado."
+                if datos_endpoint:
+                    respuesta = f"📊 Sistema conectado con datos reales. Puedes preguntar sobre: consumo, eficiencia, estado del sistema. Datos disponibles desde {datos_endpoint.get('dateStart', 'N/A')}."
+                else:
+                    respuesta = f"Analizando {maquina_seleccionada} por {periodo_seleccionado.lower()}. Puedes preguntar sobre: consumo, eficiencia, datos del sistema, estado."
         
         # Agregar respuesta al historial
         st.session_state.mensajes.append({"role": "assistant", "content": respuesta})
