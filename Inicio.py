@@ -4,7 +4,6 @@ import numpy as np
 import requests
 import json
 import base64
-from requests.auth import HTTPBasicAuth
 
 # Importación condicional de Google Generative AI
 try:
@@ -287,20 +286,7 @@ elif GEMINI_AVAILABLE and not api_key_gemini:
 else:
     st.sidebar.error("❌ Google Generative AI no disponible")
 
-# Configuración manual de endpoint (para testing)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔧 Configuración API")
-custom_endpoint = st.sidebar.text_input(
-    "Endpoint personalizado (opcional):",
-    placeholder="https://energy-api-628964750053.us-east1.run.app/api/data",
-    help="Si encuentras un endpoint que funciona, úsalo aquí"
-)
-
-# Mostrar endpoint que funciona si se encontró
-if "working_endpoint" in st.session_state:
-    st.sidebar.success(f"✅ Endpoint encontrado: {st.session_state.working_endpoint}")
-    if st.sidebar.button("🎯 Usar Endpoint Encontrado"):
-        custom_endpoint = st.session_state.working_endpoint
 
 # Botón para consultar endpoint
 if st.sidebar.button("🔌 Consultar Datos del Sistema", use_container_width=True):
@@ -314,7 +300,7 @@ if st.sidebar.button("🔌 Consultar Datos del Sistema", use_container_width=Tru
             else:
                 st.error("❌ Error al obtener datos")
 
-# Mostrar estado de la conexión al endpoint con más detalle
+# Mostrar estado de la conexión al endpoint
 if "datos_endpoint" in st.session_state:
     st.sidebar.success("🟢 Conectado al sistema de energía")
     # Mostrar información básica de los datos
@@ -323,7 +309,6 @@ if "datos_endpoint" in st.session_state:
         st.sidebar.info(f"📊 Datos disponibles: {num_keys} campos")
 else:
     st.sidebar.warning("🔴 Sin conexión al sistema")
-    st.sidebar.info("💡 Usa 'Test Conexión' para diagnosticar")
 
 st.sidebar.markdown("---")
 
@@ -458,13 +443,13 @@ with col1:
 with col2:
     st.subheader("🤖 ¡Hola! Soy tú asistente S.O.S EnergIA")
     
-    # Verificar si OpenAI está configurado
-    if not OPENAI_AVAILABLE:
-        st.warning("⚠️ OpenAI no está instalado. Ejecuta: `pip install openai` para habilitar IA avanzada.")
-        st.info("💡 Mientras tanto, puedes usar las preguntas predefinidas básicas.")
-    elif not api_key_openai:
-        st.warning("⚠️ Configura tu API Key de OpenAI en el sidebar para usar el asistente inteligente.")
-        st.info("💡 Mientras tanto, puedes usar las preguntas predefinidas básicas.")
+    # Verificar si Gemini está configurado
+    if not GEMINI_AVAILABLE:
+        st.warning("Configura Google Generative AI. Ejecuta: pip install google-generativeai para habilitar IA avanzada.")
+        st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
+    elif not api_key_gemini:
+        st.warning("Configura tu API Key de Google Gemini en el sidebar para usar el asistente inteligente.")
+        st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
     
     # Inicializar el historial de chat
     if "mensajes" not in st.session_state:
@@ -589,7 +574,7 @@ with col2:
                 if datos_endpoint:
                     respuesta = f"📊 Sistema conectado con datos reales. Puedes preguntar sobre: consumo, eficiencia, estado del sistema. Datos disponibles desde {datos_endpoint.get('dateStart', 'N/A')}."
                 else:
-                    respuesta = f"Analizando {maquina_seleccionada} por {periodo_seleccionado.lower()}. Puedes preguntar sobre: consumo, eficiencia, datos del sistema, estado."
+                    respuesta = f"Analizando {maquina_seleccionada} por {periodo_seleccionado.lower()}. Configura Gemini API para respuestas más inteligentes. Puedes preguntar sobre: consumo, eficiencia, datos del sistema, estado."
         
         # Agregar respuesta al historial
         st.session_state.mensajes.append({"role": "assistant", "content": respuesta})
