@@ -29,9 +29,14 @@ def consultar_endpoint_energia():
     try:
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
-        # Usar el mismo método de autenticación que funciona en Digital Ocean
-        username = 'sume'
-        password = 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'
+        # Obtener credenciales de secrets de Streamlit
+        try:
+            username = st.secrets["API_USERNAME"]
+            password = st.secrets["API_PASSWORD"]
+        except KeyError as e:
+            st.error(f"Error: Falta configurar {e} en los secrets de Streamlit")
+            st.info("Configura las credenciales en Settings > Secrets")
+            return None
         
         # Crear las credenciales exactamente como en Digital Ocean
         credentials = f"{username}:{password}"
@@ -45,6 +50,7 @@ def consultar_endpoint_energia():
         }
         
         st.sidebar.write(f"🔗 Consultando: {url}")
+        st.sidebar.write(f"🔐 Usuario: {username}")
         st.sidebar.write(f"🔐 Auth Header: Basic {encoded_credentials[:20]}...")  # Mostrar solo primeros caracteres
         
         # Realizar la petición usando requests pero con headers manuales
