@@ -30,8 +30,8 @@ def consultar_endpoint_energia():
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
         # Usar el mismo método de autenticación que funciona en Digital Ocean
-        username = st.secrets["settings"]["API_USERNAME"]  #'sume'  
-        password = st.secrets["settings"]["API_PASSWORD"]  #'QduLQm/*=A$1%zz65PN£krhuE<Oc<D' # 
+        username = st.secrets["settings"]["API_USERNAME"]   
+        password = st.secrets["settings"]["API_PASSWORD"]   
         
         # Crear las credenciales exactamente como en Digital Ocean
         credentials = f"{username}:{password}"
@@ -271,13 +271,13 @@ if not GEMINI_AVAILABLE:
     st.sidebar.code("pip install google-generativeai")
     api_key_gemini = None
 else:
-    api_key_gemini = st.sidebar.text_input(
-        "API Key de Google Gemini:",
-        type="password",
-        help="Ingresa tu API Key de Google Gemini 2.5 Pro para habilitar el asistente inteligente",
-        placeholder="AI..."
-    )
-
+  #  api_key_gemini = st.sidebar.text_input(
+  #      "API Key de Google Gemini:",
+  #      type="password",
+  #      help="Ingresa tu API Key de Google Gemini 2.5 Pro para habilitar el asistente inteligente",
+  #      placeholder="AI..."
+  #  )
+    api_key_gemini = st.secrets["settings"]["GEMINI_API_KEY"] 
 # Indicador del estado de la API
 if GEMINI_AVAILABLE and api_key_gemini:
     st.sidebar.success("✅ API Key configurada")
