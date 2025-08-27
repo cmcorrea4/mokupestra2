@@ -30,8 +30,8 @@ def consultar_endpoint_energia():
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
         # Usar el mismo método de autenticación que funciona en Digital Ocean
-        username = 'sume'
-        password = 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'
+        username = st.secrets["settings"]["API_USERNAME"]  #'sume'  
+        password = st.secrets["settings"]["API_PASSWORD"]  #'QduLQm/*=A$1%zz65PN£krhuE<Oc<D' # 
         
         # Crear las credenciales exactamente como en Digital Ocean
         credentials = f"{username}:{password}"
