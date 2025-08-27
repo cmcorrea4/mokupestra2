@@ -4,7 +4,14 @@ import numpy as np
 import requests
 import json
 from requests.auth import HTTPBasicAuth
-import openai
+
+# Importación condicional de OpenAI
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    st.warning("⚠️ OpenAI no está instalado. Instala con: pip install openai")
 
 # Configuración de la página
 st.set_page_config(
@@ -22,19 +29,74 @@ def consultar_endpoint_energia():
     """Consulta el endpoint de energía con las credenciales proporcionadas"""
     try:
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
+        
+        # Configurar headers adicionales
+        headers = {
+            'User-Agent': 'ESTRA-Streamlit-App/1.0',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+        
+        # Credenciales de autenticación básica
         auth = HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D')
         
-        response = requests.get(url, auth=auth, timeout=10)
+        # Realizar la petición con mayor timeout
+        response = requests.get(
+            url, 
+            auth=auth, 
+            headers=headers,
+            timeout=30,
+            verify=True  # Verificar certificados SSL
+        )
+        
+        # Log de debug (opcional)
+        st.sidebar.write(f"🔍 Status Code: {response.status_code}")
+        
+        # Verificar el código de estado
+        if response.status_code == 401:
+            st.error("❌ Error de autenticación (401). Verificar credenciales.")
+            return None
+        elif response.status_code == 403:
+            st.error("❌ Acceso prohibido (403). Sin permisos.")
+            return None
+        elif response.status_code == 404:
+            st.error("❌ Endpoint no encontrado (404).")
+            return None
+        
         response.raise_for_status()
         
-        return response.json()
+        # Intentar parsear JSON
+        try:
+            data = response.json()
+            st.sidebar.success(f"✅ Datos obtenidos: {len(str(data))} caracteres")
+            return data
+        except json.JSONDecodeError:
+            st.error("❌ Respuesta no es JSON válido")
+            st.sidebar.write(f"Respuesta recibida: {response.text[:200]}...")
+            return None
+            
+    except requests.exceptions.Timeout:
+        st.error("⏰ Timeout: El servidor tardó demasiado en responder")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("🌐 Error de conexión: No se pudo conectar al servidor")
+        return None
+    except requests.exceptions.SSLError:
+        st.error("🔒 Error SSL: Problema con el certificado")
+        return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Error al consultar el endpoint: {str(e)}")
+        st.error(f"❌ Error en la petición: {str(e)}")
+        return None
+    except Exception as e:
+        st.error(f"❌ Error inesperado: {str(e)}")
         return None
 
 # Función para generar respuesta con OpenAI
 def generar_respuesta_openai(prompt, datos_energia, maquina_seleccionada, api_key):
     """Genera respuesta usando OpenAI con los datos del endpoint"""
+    if not OPENAI_AVAILABLE:
+        return "❌ OpenAI no está disponible. Por favor instala la librería: pip install openai"
+    
     try:
         client = openai.OpenAI(api_key=api_key)
         
@@ -180,38 +242,86 @@ st.sidebar.header("🔧 Panel de Control")
 
 # Campo para API KEY de OpenAI
 st.sidebar.markdown("### 🤖 Configuración de IA")
-api_key_openai = st.sidebar.text_input(
-    "API Key de OpenAI:",
-    type="password",
-    help="Ingresa tu API Key de OpenAI para habilitar el asistente inteligente",
-    placeholder="sk-..."
-)
+
+if not OPENAI_AVAILABLE:
+    st.sidebar.error("❌ OpenAI no instalado")
+    st.sidebar.code("pip install openai")
+    api_key_openai = None
+else:
+    api_key_openai = st.sidebar.text_input(
+        "API Key de OpenAI:",
+        type="password",
+        help="Ingresa tu API Key de OpenAI para habilitar el asistente inteligente",
+        placeholder="sk-..."
+    )
 
 # Indicador del estado de la API
-if api_key_openai:
+if OPENAI_AVAILABLE and api_key_openai:
     st.sidebar.success("✅ API Key configurada")
-else:
+elif OPENAI_AVAILABLE and not api_key_openai:
     st.sidebar.warning("⚠️ API Key requerida para IA")
+else:
+    st.sidebar.error("❌ OpenAI no disponible")
 
 st.sidebar.markdown("---")
 
-# Botón para consultar endpoint
-if st.sidebar.button("🔌 Consultar Datos del Sistema", use_container_width=True):
-    with st.sidebar:
-        with st.spinner("Consultando endpoint..."):
-            datos_endpoint = consultar_endpoint_energia()
-            if datos_endpoint:
-                st.success("✅ Datos obtenidos correctamente")
-                # Guardar en session state para uso posterior
-                st.session_state.datos_endpoint = datos_endpoint
-            else:
-                st.error("❌ Error al obtener datos")
+# Botón para consultar endpoint con debug
+col_btn1, col_btn2 = st.sidebar.columns(2)
 
-# Mostrar estado de la conexión al endpoint
+with col_btn1:
+    if st.button("🔌 Consultar API", use_container_width=True):
+        with st.sidebar:
+            with st.spinner("Consultando endpoint..."):
+                st.write("🔄 Conectando al servidor...")
+                datos_endpoint = consultar_endpoint_energia()
+                if datos_endpoint:
+                    st.success("✅ Datos obtenidos correctamente")
+                    # Guardar en session state para uso posterior
+                    st.session_state.datos_endpoint = datos_endpoint
+                else:
+                    st.error("❌ Error al obtener datos")
+
+with col_btn2:
+    if st.button("🧪 Test Conexión", use_container_width=True):
+        with st.sidebar:
+            with st.spinner("Probando conexión..."):
+                try:
+                    # Test simple de conectividad
+                    test_response = requests.get(
+                        "https://energy-api-628964750053.us-east1.run.app/",
+                        timeout=5
+                    )
+                    st.write(f"🌐 Servidor responde: {test_response.status_code}")
+                except Exception as e:
+                    st.write(f"🌐 Error de conexión: {str(e)}")
+                
+                # Test de autenticación
+                try:
+                    auth_test = requests.get(
+                        "https://energy-api-628964750053.us-east1.run.app/test-summary",
+                        auth=HTTPBasicAuth('sume', 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'),
+                        timeout=10
+                    )
+                    st.write(f"🔐 Auth test: {auth_test.status_code}")
+                    if auth_test.status_code == 200:
+                        st.write("✅ Autenticación OK")
+                    elif auth_test.status_code == 401:
+                        st.write("❌ Credenciales incorrectas")
+                    else:
+                        st.write(f"⚠️ Respuesta: {auth_test.status_code}")
+                except Exception as e:
+                    st.write(f"🔐 Error auth: {str(e)}")
+
+# Mostrar estado de la conexión al endpoint con más detalle
 if "datos_endpoint" in st.session_state:
-    st.sidebar.info("🟢 Conectado al sistema de energía")
+    st.sidebar.success("🟢 Conectado al sistema de energía")
+    # Mostrar información básica de los datos
+    if isinstance(st.session_state.datos_endpoint, dict):
+        num_keys = len(st.session_state.datos_endpoint.keys())
+        st.sidebar.info(f"📊 Datos disponibles: {num_keys} campos")
 else:
-    st.sidebar.info("🔴 Sin conexión al sistema")
+    st.sidebar.warning("🔴 Sin conexión al sistema")
+    st.sidebar.info("💡 Usa 'Test Conexión' para diagnosticar")
 
 st.sidebar.markdown("---")
 
@@ -326,7 +436,10 @@ with col2:
     st.subheader("🤖 ¡Hola! Soy tú asistente S.O.S EnergIA")
     
     # Verificar si OpenAI está configurado
-    if not api_key_openai:
+    if not OPENAI_AVAILABLE:
+        st.warning("⚠️ OpenAI no está instalado. Ejecuta: `pip install openai` para habilitar IA avanzada.")
+        st.info("💡 Mientras tanto, puedes usar las preguntas predefinidas básicas.")
+    elif not api_key_openai:
         st.warning("⚠️ Configura tu API Key de OpenAI en el sidebar para usar el asistente inteligente.")
         st.info("💡 Mientras tanto, puedes usar las preguntas predefinidas básicas.")
     
@@ -388,7 +501,7 @@ with col2:
         st.session_state.mensajes.append({"role": "user", "content": prompt_to_process})
         
         # Generar respuesta
-        if api_key_openai:
+        if OPENAI_AVAILABLE and api_key_openai:
             # Usar OpenAI con datos del endpoint
             datos_endpoint = st.session_state.get("datos_endpoint", None)
             with st.spinner("🤖 Generando respuesta..."):
