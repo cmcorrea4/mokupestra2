@@ -29,14 +29,9 @@ def consultar_endpoint_energia():
     try:
         url = "https://energy-api-628964750053.us-east1.run.app/test-summary"
         
-        # Obtener credenciales de secrets de Streamlit
-        try:
-            username = st.secrets["API_USERNAME"]
-            password = st.secrets["API_PASSWORD"]
-        except KeyError as e:
-            st.error(f"Error: Falta configurar {e} en los secrets de Streamlit")
-            st.info("Configura las credenciales en Settings > Secrets")
-            return None
+        # Usar el mismo método de autenticación que funciona en Digital Ocean
+        username = 'sume'
+        password = 'QduLQm/*=A$1%zz65PN£krhuE<Oc<D'
         
         # Crear las credenciales exactamente como en Digital Ocean
         credentials = f"{username}:{password}"
@@ -50,7 +45,6 @@ def consultar_endpoint_energia():
         }
         
         st.sidebar.write(f"🔗 Consultando: {url}")
-        st.sidebar.write(f"🔐 Usuario: {username}")
         st.sidebar.write(f"🔐 Auth Header: Basic {encoded_credentials[:20]}...")  # Mostrar solo primeros caracteres
         
         # Realizar la petición usando requests pero con headers manuales
@@ -111,18 +105,12 @@ def consultar_endpoint_energia():
         return None
 
 # Función para generar respuesta con Google Gemini 2.5 Pro
-def generar_respuesta_gemini(prompt, datos_energia, maquina_seleccionada):
+def generar_respuesta_gemini(prompt, datos_energia, maquina_seleccionada, api_key):
     """Genera respuesta usando Google Gemini 2.5 Pro con los datos del endpoint"""
     if not GEMINI_AVAILABLE:
         return "❌ Google Generative AI no está disponible. Instala la librería: pip install google-generativeai"
     
     try:
-        # Obtener API key de secrets
-        try:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        except KeyError:
-            return "❌ Error: GEMINI_API_KEY no configurada en secrets. Configúrala en Settings > Secrets"
-        
         # Configurar API key de Gemini
         genai.configure(api_key=api_key)
         
@@ -273,35 +261,30 @@ def mostrar_estadisticas(centro_seleccionado, periodo_seleccionado):
         )       
 
 # Sidebar para controles
-st.sidebar.header("Panel de Control")
+st.sidebar.header("🔧 Panel de Control")
 
-# Estado de configuración de servicios
-st.sidebar.markdown("### Estado de Servicios")
+# Campo para API KEY de Gemini
+st.sidebar.markdown("### 🤖 Configuración de IA")
 
-# Verificar configuración de API
-gemini_configured = False
-try:
-    gemini_api_key = st.secrets["GEMINI_API_KEY"]
-    if GEMINI_AVAILABLE and gemini_api_key:
-        st.sidebar.success("Gemini API configurada")
-        gemini_configured = True
-    else:
-        st.sidebar.warning("Gemini API no disponible")
-except KeyError:
-    st.sidebar.error("Gemini API no configurada")
+if not GEMINI_AVAILABLE:
+    st.sidebar.error("❌ Google Generative AI no instalado")
+    st.sidebar.code("pip install google-generativeai")
+    api_key_gemini = None
+else:
+    api_key_gemini = st.sidebar.text_input(
+        "API Key de Google Gemini:",
+        type="password",
+        help="Ingresa tu API Key de Google Gemini 2.5 Pro para habilitar el asistente inteligente",
+        placeholder="AI..."
+    )
 
-# Verificar credenciales del endpoint
-endpoint_configured = False
-try:
-    api_username = st.secrets["API_USERNAME"]
-    api_password = st.secrets["API_PASSWORD"]
-    st.sidebar.success("Credenciales API configuradas")
-    endpoint_configured = True
-except KeyError:
-    st.sidebar.error("Credenciales API no configuradas")
-
-if not (gemini_configured and endpoint_configured):
-    st.sidebar.info("Configura secrets en Settings > Secrets")
+# Indicador del estado de la API
+if GEMINI_AVAILABLE and api_key_gemini:
+    st.sidebar.success("✅ API Key configurada")
+elif GEMINI_AVAILABLE and not api_key_gemini:
+    st.sidebar.warning("⚠️ API Key requerida para IA")
+else:
+    st.sidebar.error("❌ Google Generative AI no disponible")
 
 st.sidebar.markdown("---")
 
@@ -464,8 +447,8 @@ with col2:
     if not GEMINI_AVAILABLE:
         st.warning("Configura Google Generative AI. Ejecuta: pip install google-generativeai para habilitar IA avanzada.")
         st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
-    elif not gemini_configured:
-        st.warning("Configura GEMINI_API_KEY en Settings > Secrets para usar el asistente inteligente.")
+    elif not api_key_gemini:
+        st.warning("Configura tu API Key de Google Gemini en el sidebar para usar el asistente inteligente.")
         st.info("Mientras tanto, puedes usar las preguntas predefinidas básicas.")
     
     # Inicializar el historial de chat
@@ -473,7 +456,7 @@ with col2:
         st.session_state.mensajes = []
         # Mensaje de bienvenida
         mensaje_bienvenida = "¿En que puedo ayudarte desde nuestro centro de analítica de datos para el Sistema de Gestión Energética?"
-        if gemini_configured:
+        if api_key_gemini:
             mensaje_bienvenida += " Gemini 2.5 Pro activado."
         st.session_state.mensajes.append({
             "role": "assistant", 
@@ -526,14 +509,15 @@ with col2:
         st.session_state.mensajes.append({"role": "user", "content": prompt_to_process})
         
         # Generar respuesta
-        if GEMINI_AVAILABLE and gemini_configured:
+        if GEMINI_AVAILABLE and api_key_gemini:
             # Usar Gemini con datos del endpoint
             datos_endpoint = st.session_state.get("datos_endpoint", None)
             with st.spinner("Generando respuesta con Gemini..."):
                 respuesta = generar_respuesta_gemini(
                     prompt_to_process, 
                     datos_endpoint, 
-                    maquina_seleccionada
+                    maquina_seleccionada, 
+                    api_key_gemini
                 )
         else:
             # Respuestas básicas predefinidas usando datos reales si están disponibles
